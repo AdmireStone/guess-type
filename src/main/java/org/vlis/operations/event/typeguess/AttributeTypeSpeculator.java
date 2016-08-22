@@ -33,7 +33,7 @@ import com.jayway.jsonpath.JsonPath;
  *
  */
 public class AttributeTypeSpeculator implements TypeGuessVisitor {
-	private Map<Integer, String> keyTypePairs = new ConcurrentHashMap<Integer, String>();
+	private Map<Integer, Integer> keyTypePairs = new ConcurrentHashMap<Integer, Integer>();
 	private static final Logger LOGGER = LogManager.getLogger(AttributeTypeSpeculator.class);
 	private String alterSQL = "update  vlis_analytics2.behavior_event_attribute set ATTR_TYPE=?, IS_GUESSED=?, MODIFY_TIME=?  where ATTR_ID=?";
 	private String judgeGuessedSQL = "select ATTR_TYPE from  vlis_analytics2.behavior_event_attribute where  ATTR_ID=?";
@@ -46,11 +46,11 @@ public class AttributeTypeSpeculator implements TypeGuessVisitor {
 		// 类型猜测
 		for (Key key : eventBean.getKeys()) {
 			if (!isGuessed(key)) {
-				speculateAttributType(key, jsonObjectList, keyTypePairs);
+				keyTypePairs.put(key.getAttributeId(), speculateAttributType(key, jsonObjectList));
 			}
+			// 将类型更新到数据库
+			new updateAttributeTypeThread(keyTypePairs).run();
 		}
-		// 将类型更新到数据库
-		EVENT_SERVICE.submit(new updateAttributeTypeThread(keyTypePairs));
 	}
 
 	/**
@@ -59,18 +59,19 @@ public class AttributeTypeSpeculator implements TypeGuessVisitor {
 	 * @param attributeBean
 	 *            待猜测的属性类型
 	 */
-	public void speculateAttributType(Key attributeBean, List<Object> jsonObjectList,
-			Map<Integer, String> keyTypePairs) {
+	public int speculateAttributType(Key attributeBean, List<Object> jsonObjectList) {
+		int type = 0;
 		if (jsonObjectList == null) {
-			return;
+			return type;
 		}
 		List<String> values = getSpecificCloumnValues(jsonObjectList, attributeBean.getJsonPath());
 		SpeculateKeyTypeCounter speculateKeyTypeCounter = new SpeculateKeyTypeCounter();
 		for (String value : values) {
 			speculateKeyTypeCounter.distinguishKeyAndCount(value);
 		}
-		keyTypePairs.put(Integer.valueOf(attributeBean.getAttributeId()), speculateKeyTypeCounter.getKeyType());
-		attributeBean.setAttributeType(speculateKeyTypeCounter.getKeyType());
+		type = speculateKeyTypeCounter.getKeyType();
+		attributeBean.setAttributeType(type);
+		return type;
 	}
 
 	/**
@@ -94,67 +95,9 @@ public class AttributeTypeSpeculator implements TypeGuessVisitor {
 		return values;
 	}
 
-	/**
-	 * 将字符串表达的数据类型转化为数据库中存储的数字类型
-	 * 
-	 * @param type
-	 *            字符串表达的数据类型
-	 * @return 对应的数字类型
-	 */
-	public static int convertKeyTypetoInt(String type) {
-		if (type.equals(TypeGuessConstant.BOOLEAN_TYPE))
-			return 1;
-		if (type.equals(TypeGuessConstant.LONG_TYPE))
-			return 2;
-		if (type.equals(TypeGuessConstant.DOUBLE_TYPE))
-			return 3;
-		if (type.equals(TypeGuessConstant.STRING_TYPE))
-			return 4;
-		if (type.equals(TypeGuessConstant.DATE_TYPE))
-			return 5;
-		LOGGER.error("wrong type value", new NumberFormatException());
-		return 0;
-	}
-	
-	/**
-	 * 将数据库中用数字表示的类型转换为对应的字面类型
-	 * @param type
-	 * @return
-	 */
-	public String convertKeyTypetoString(int type) {
-		if (type==1)
-			return TypeGuessConstant.BOOLEAN_TYPE ;
-		if (type==2)
-			return TypeGuessConstant.LONG_TYPE;
-		if (type==3)
-			return TypeGuessConstant.DOUBLE_TYPE;
-		if (type==4)
-			return TypeGuessConstant.STRING_TYPE;
-		if (type==5)
-			return TypeGuessConstant.DATE_TYPE;
-		LOGGER.error("wrong type value", new NumberFormatException());
-		return "unKonwType:type="+type;
-	}
-
 	public boolean isGuessed(Key key) {
-		Connection conn = MysqlOperationUtil.getConnection();
-		PreparedStatement prepareStatement = null;
-		int ATTR_TYPE = -1;
-		try {
-			// 查找未被更新的记录
-			prepareStatement = conn.prepareStatement(judgeGuessedSQL);
-			prepareStatement.setInt(1, key.getAttributeId());
-			ResultSet resultSet = MysqlOperationUtil.doSelect(prepareStatement);
-			resultSet.next();
-			ATTR_TYPE = resultSet.getInt("ATTR_TYPE");
-		} catch (SQLException e) {
-			// TODO Auto-generated catch block
-			LOGGER.error("judge attribute type failed!", e);
-		}
-		if (ATTR_TYPE == 0) {
+		if (key.getAttributeType() == 0)
 			return false;
-		}
-		key.setAttributeType(convertKeyTypetoString(ATTR_TYPE));
 		return true;
 	}
 
@@ -165,13 +108,14 @@ public class AttributeTypeSpeculator implements TypeGuessVisitor {
 	 *
 	 */
 	class updateAttributeTypeThread implements Runnable {
-		private Map<Integer, String> keyTypePairs = new ConcurrentHashMap<Integer, String>();
+		// Map<attrId,attr_type>
+		private Map<Integer, Integer> keyTypePairs = new ConcurrentHashMap<Integer, Integer>();
 
 		public void run() {
 			updateDBAttributeTypeandStatus();
 		}
 
-		public updateAttributeTypeThread(Map<Integer, String> keyTypePairs) {
+		public updateAttributeTypeThread(Map<Integer, Integer> keyTypePairs) {
 			this.keyTypePairs = keyTypePairs;
 		}
 
@@ -181,8 +125,8 @@ public class AttributeTypeSpeculator implements TypeGuessVisitor {
 			for (int attr_id : keyTypePairs.keySet()) {
 				try {
 					PreparedStatement prepareStatement = conn.prepareStatement(alterSQL);
-					String type = keyTypePairs.get(attr_id);
-					prepareStatement.setInt(1, convertKeyTypetoInt(type));
+					int type = keyTypePairs.get(attr_id);
+					prepareStatement.setInt(1, type);
 					// 状态设置为已猜测
 					prepareStatement.setInt(2, 1);
 					prepareStatement.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
@@ -200,18 +144,17 @@ public class AttributeTypeSpeculator implements TypeGuessVisitor {
 	public static void main(String[] args) throws Exception {
 		OperationConfig.init();
 		List<Key> listkeys = new ArrayList<Key>();
-		listkeys.add(new Key(11, "account", "$.node_0.db.t_account_select.result.[0].t_account#account", ""));
-		listkeys.add(new Key(12, "grade", "$.node_0.db.t_account_select.result.[0].t_account#grade", ""));
-		listkeys.add(new Key(13, "'lastLoginTime",
-				"$.node_0.db.t_account_select.result.[0].t_account#lastLoginTime", ""));
+		listkeys.add(new Key(11, "account", "$.node_0.db.t_account_select.result.[0].t_account#account", 0));
+		listkeys.add(new Key(12, "grade", "$.node_0.db.t_account_select.result.[0].t_account#grade", 0));
 		listkeys.add(
-				new Key(14, "phone", "$.node_0.http.response.ns2_selectByIdResponse.[0].return.[0].phone", ""));
+				new Key(13, "'lastLoginTime", "$.node_0.db.t_account_select.result.[0].t_account#lastLoginTime", 0));
+		listkeys.add(new Key(14, "phone", "$.node_0.http.response.ns2_selectByIdResponse.[0].return.[0].phone", 0));
 		EventBean evnetBean = new EventBean("inchina", 1, "", "application@10.10.105.241:8080^1469000675303^4",
 				"/jeeshopserver_address/addressServiceFront", listkeys);
 		AttributeTypeSpeculator task = new AttributeTypeSpeculator();
 		task.guess(evnetBean);
-		for(Key key:evnetBean.getKeys()){
-			     System.out.println(key.getAttributeName()+":"+key.getAttributeType());
+		for (Key key : evnetBean.getKeys()) {
+			System.out.println(key.getAttributeName() + ":" + key.getAttributeType());
 		}
 	}
 }

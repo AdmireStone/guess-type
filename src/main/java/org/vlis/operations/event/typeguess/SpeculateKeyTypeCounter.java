@@ -61,28 +61,53 @@ public class SpeculateKeyTypeCounter {
         }
     }
     
-    public String getKeyType(){
+//    public String getKeyType(){
+//        
+//        if( 0 != counterContainer.get(keyTypeCounter.STRING_TYPE.getType()).getTypeCount() ){
+//            //String
+//            return keyTypeCounter.STRING_TYPE.getType();
+//        }else if( 0 != counterContainer.get(keyTypeCounter.DATE_TYPE.getType()).getTypeCount() ){
+//            //Date
+//            return keyTypeCounter.DATE_TYPE.getType();
+//        }else if(0 != counterContainer.get(keyTypeCounter.BOOLEAN_TYPE.getType()).getTypeCount() ){
+//            //Boolean 
+//            return keyTypeCounter.BOOLEAN_TYPE.getType();
+//        }else if( 0 != counterContainer.get(keyTypeCounter.DOUBLE_TYPE.getType()).getTypeCount() ){
+//            //Double 
+//            return keyTypeCounter.DOUBLE_TYPE.getType();
+//        }else if( 0 != counterContainer.get(keyTypeCounter.LONG_TYPE.getType()).getTypeCount() ){
+//            //Long
+//            return keyTypeCounter.LONG_TYPE.getType();
+//        }else{
+//            throw new IllegalStateException();
+//        }
+//    }
+    /**
+     * using different number to represent each data type 
+     * the mapping relationship followed the definition of database
+     * @return the attribute type 
+     */
+    public int getKeyType(){
         
         if( 0 != counterContainer.get(keyTypeCounter.STRING_TYPE.getType()).getTypeCount() ){
             //String
-            return keyTypeCounter.STRING_TYPE.getType();
+            return 4;
         }else if( 0 != counterContainer.get(keyTypeCounter.DATE_TYPE.getType()).getTypeCount() ){
             //Date
-            return keyTypeCounter.DATE_TYPE.getType();
+            return 5;
         }else if(0 != counterContainer.get(keyTypeCounter.BOOLEAN_TYPE.getType()).getTypeCount() ){
             //Boolean 
-            return keyTypeCounter.BOOLEAN_TYPE.getType();
+            return 1;
         }else if( 0 != counterContainer.get(keyTypeCounter.DOUBLE_TYPE.getType()).getTypeCount() ){
             //Double 
-            return keyTypeCounter.DOUBLE_TYPE.getType();
+            return 3;
         }else if( 0 != counterContainer.get(keyTypeCounter.LONG_TYPE.getType()).getTypeCount() ){
             //Long
-            return keyTypeCounter.LONG_TYPE.getType();
+            return 2;
         }else{
             throw new IllegalStateException();
         }
     }
-    
     @SuppressWarnings("unused")
     private Map<Integer, String> sortMapByKey(Map<Integer, String> oriMap) {  
         if (oriMap == null || oriMap.isEmpty()) {  
@@ -125,7 +150,6 @@ public class SpeculateKeyTypeCounter {
             }
             
             public int getTypeCount(){
-            	LOGGER.error("asda");
                 return this.count;
             }
         }

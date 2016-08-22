@@ -39,18 +39,13 @@ public class EventBean extends RuleBean {
     }
 
     public static class Key {
-        public static final String BOOLEAN = "Boolean";
-        public static final String LONG = "Long";
-        public static final String DOUBLE = "Double";
-        public static final String STRING = "String";
-        public static final String DATE = "Date";
 
         private int attributeId;
         private String attributeName;
         private String jsonPath;
-        private String attributeType;
+        private int attributeType;
 
-        public Key(int attributeId, String attributeName, String jsonPath, String attributeType) {
+        public Key(int attributeId, String attributeName, String jsonPath, int attributeType) {
             this.attributeId = attributeId;
             this.attributeName = attributeName;
             this.jsonPath = jsonPath;
@@ -73,11 +68,11 @@ public class EventBean extends RuleBean {
             this.jsonPath = jsonPath;
         }
 
-        public String getAttributeType() {
+        public int getAttributeType() {
             return attributeType;
         }
 
-        public void setAttributeType(String attributeType) {
+        public void setAttributeType(int attributeType) {
             this.attributeType = attributeType;
         }
 

@@ -1,9 +1,8 @@
 package org.vlis.operations.event.typeguess.constant;
 
 public final class TypeGuessConstant {
-    public  final static  String BOOLEAN_TYPE = new String("Boolean");
-    public  final static String DATE_TYPE = new String("Date");
-    public  final static String STRING_TYPE = new String("String");
-    public  final static String DOUBLE_TYPE = new String("Double");
-    public  final static String LONG_TYPE = new String("Long");
+	public final static int BOOLEAN_TYPE = 1;
+	public final static int LONG_TYPE = 2;
+	public final static int DOUBLE_TYPE = 3;
+	public final static int STRING_TYPE = 4;
 }
